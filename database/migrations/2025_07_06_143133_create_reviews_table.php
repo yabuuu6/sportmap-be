@@ -7,23 +7,27 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Jalankan migrasi.
      */
     public function up(): void
     {
         Schema::create('reviews', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('sports_field_id')->constrained()->onDelete('cascade');
-            $table->unsignedTinyInteger('rating'); // 1–5
+
+            // Relasi ke users
+            $table->unsignedBigInteger('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->unsignedBigInteger('sports_field_id');
+            $table->foreign('sports_field_id')->references('id')->on('sports_fields')->onDelete('cascade');
             $table->text('comment')->nullable();
+            $table->tinyInteger('rating');
             $table->timestamps();
+            $table->unique(['user_id', 'sports_field_id']);
         });
     }
 
-
     /**
-     * Reverse the migrations.
+     * Balikkan migrasi.
      */
     public function down(): void
     {

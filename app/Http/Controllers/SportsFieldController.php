@@ -13,7 +13,6 @@ class SportsFieldController extends Controller
     {
         $query = SportsField::query();
 
-        // Filter berdasarkan jenis olahraga
         if ($request->has('type')) {
             $query->where('type', $request->type);
         }
@@ -47,6 +46,9 @@ class SportsFieldController extends Controller
 
     public function show(SportsField $sportsField)
     {
+        $sportsField->load('reviews');
+        $sportsField->load(['reviews.user', 'owner', 'facilities']);
+
         return response()->json([
             'status_code' => 200,
             'message' => 'Sports field found',
@@ -54,30 +56,45 @@ class SportsFieldController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'location' => 'required|string|max:255',
-            'type' => 'required|string|max:100',
-        ]);
+public function store(Request $request)
+{
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'location' => 'required|string|max:255',
+        'type' => 'required|string|max:100',
+        'latitude' => 'required|numeric',
+        'longitude' => 'required|numeric',
+        'image' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+    ]);
 
-        try {
-            $field = SportsField::create($request->only('name', 'location', 'type'));
+    try {
+        $data = $request->only(['name', 'location', 'type', 'latitude', 'longitude']);
 
-            return response()->json([
-                'status_code' => 201,
-                'message' => 'Sports field created successfully',
-                'data' => $field
-            ], 201);
-        } catch (Exception $e) {
-            return response()->json([
-                'status_code' => 500,
-                'message' => 'Failed to create sports field',
-                'error' => $e->getMessage()
-            ], 500);
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('field-images', 'public');
+            $data['image_path'] = $path;
         }
+
+        $data['is_verified'] = false;
+        $data['rating'] = 0;
+
+        $field = SportsField::create($data);
+
+        return response()->json([
+            'status_code' => 201,
+            'message' => 'Lapangan berhasil ditambahkan',
+            'data' => $field,
+            'image_url' => asset('storage/' . $field->image_path),
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'status_code' => 500,
+            'message' => 'Failed to create sports field',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 
     public function update(Request $request, SportsField $sportsField)
     {
@@ -85,10 +102,19 @@ class SportsFieldController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'location' => 'sometimes|required|string|max:255',
             'type' => 'sometimes|required|string|max:100',
+            'image' => 'sometimes|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         try {
-            $sportsField->update($request->only('name', 'location', 'type'));
+            $data = $request->only('name', 'location', 'type');
+            unset($request['is_verified']);
+            if ($request->hasFile('image')) {
+                $path = $request->file('image')->store('public/field-images');
+                $filename = basename($path);
+                $data['image_path'] = 'field-images/' . $filename;
+            }
+
+            $sportsField->update($data);
 
             return response()->json([
                 'status_code' => 200,
@@ -122,22 +148,19 @@ class SportsFieldController extends Controller
             ], 500);
         }
     }
-    
 
     public function uploadPhoto(Request $request, $id)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'image_path' => 'required|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         try {
             $field = SportsField::findOrFail($id);
 
-            // Simpan gambar ke folder storage/app/public/field-images
-            $path = $request->file('image')->store('public/field-images');
+            $path = $request->file('image_path')->store('public/field-images');
             $filename = basename($path);
 
-            // Simpan nama file ke kolom image_path
             $field->image_path = 'field-images/' . $filename;
             $field->save();
 
@@ -157,5 +180,47 @@ class SportsFieldController extends Controller
             ], 500);
         }
     }
+
+    public function recommendation()
+    {
+        $fields = SportsField::where('is_verified', 1)
+            ->orderByDesc('rating')
+            ->take(5)
+            ->get();
+
+        return response()->json([
+            'status_code' => 200,
+            'message' => 'Recommended fields retrieved',
+            'data' => $fields,
+        ]);
+    }
+    public function verify(Request $request, $id)
+{
+    $user = auth()->user();
+    if (!$user || $user->role !== 'admin') {
+        return response()->json([
+            'status_code' => 403,
+            'message' => 'Hanya admin yang dapat memverifikasi lapangan'
+        ], 403);
+    }
+
+    $field = SportsField::findOrFail($id);
+
+    if ($field->is_verified) {
+        return response()->json([
+            'status_code' => 200,
+            'message' => 'Lapangan sudah diverifikasi sebelumnya'
+        ]);
+    }
+
+    $field->is_verified = true;
+    $field->save();
+
+    return response()->json([
+        'status_code' => 200,
+        'message' => 'Lapangan berhasil diverifikasi',
+        'data' => $field
+    ]);
+}
 
 }

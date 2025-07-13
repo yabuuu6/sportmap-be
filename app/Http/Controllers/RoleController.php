@@ -2,92 +2,37 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Role;
+use App\Models\Review;
+use App\Models\SportsField;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
-class RoleController extends Controller
+class ReviewController extends Controller
 {
-    // GET /roles - Ambil semua role
-    public function index()
+    public function store(Request $request, $id)
     {
-        return response()->json([
-            'status_code' => 200,
-            'message' => 'All roles retrieved successfully',
-            'data' => Role::all()
-        ]);
-    }
-
-    // POST /roles - Tambah role baru
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|unique:roles,name|max:100',
+        $request->validate([
+            'rating' => 'required|numeric|min:1|max:5',
+            'comment' => 'nullable|string',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'status_code' => 422,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+        // Cek lapangan
+        $field = SportsField::findOrFail($id);
 
-        $role = Role::create([
-            'name' => $request->name
+        // Simpan review
+        $review = new Review([
+            'user_id' => auth()->id(), // pastikan pakai auth
+            'rating' => $request->rating,
+            'comment' => $request->comment,
         ]);
+
+        $field->reviews()->save($review);
 
         return response()->json([
             'status_code' => 201,
-            'message' => 'Role created successfully',
-            'data' => $role
-        ], 201);
-    }
-
-    // GET /roles/{id} - Ambil 1 role
-    public function show(Role $role)
-    {
-        return response()->json([
-            'status_code' => 200,
-            'message' => 'Role found',
-            'data' => $role
-        ]);
-    }
-
-    // PUT /roles/{id} - Update role
-    public function update(Request $request, Role $role)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|unique:roles,name,' . $role->id . '|max:100',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status_code' => 422,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $role->update([
-            'name' => $request->name
-        ]);
-
-        return response()->json([
-            'status_code' => 200,
-            'message' => 'Role updated successfully',
-            'data' => $role
-        ]);
-    }
-
-    // DELETE /roles/{id} - Hapus role
-    public function destroy(Role $role)
-    {
-        $role->delete();
-
-        return response()->json([
-            'status_code' => 200,
-            'message' => 'Role deleted successfully'
+            'message' => 'Review berhasil ditambahkan',
+            'data' => $review
         ]);
     }
 }
+

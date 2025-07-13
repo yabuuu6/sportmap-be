@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sports_fields', function (Blueprint $table) {
-            $table->string('image_path')->nullable(); // jalur gambar disimpan
+            $table->string('image_path')->nullable();
         });
     }
 

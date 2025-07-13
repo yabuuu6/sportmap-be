@@ -11,15 +11,13 @@ use Exception;
 
 class AuthController extends Controller
 {
-    /**
-     * Register a new user.
-     */
     public function register(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|unique:users',
             'password' => 'required|string|min:6|confirmed',
+            'role' => 'in:user,admin' 
         ]);
 
         try {
@@ -27,6 +25,7 @@ class AuthController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => bcrypt($request->password),
+                'role' => $request->role ?? 'user'
             ]);
 
             return response()->json([
@@ -43,9 +42,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Login and return JWT token.
-     */
     public function login(Request $request)
     {
         $request->validate([
@@ -73,20 +69,22 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Get the authenticated user's data.
-     */
     public function me()
     {
         try {
-            $user = Auth::guard('api')->user();
+            $user = auth()->user();
 
             return response()->json([
                 'status_code' => 200,
                 'message' => 'User retrieved successfully',
-                'data' => $user
+                'data' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ]
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status_code' => 500,
                 'message' => 'Failed to retrieve user',
@@ -95,9 +93,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Logout user (invalidate token).
-     */
     public function logout()
     {
         try {
